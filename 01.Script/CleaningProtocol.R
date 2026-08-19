@@ -875,18 +875,10 @@ view(population_final)
 view(interactions_final)
 
 # Saving Population .csv
-write.csv(
-  population_final,
-  here("population_final.csv"),
-  row.names = FALSE
-)
+write.csv(population_final,"03.Output/population_final.csv", row.names = FALSE)
 
 # Saving Interactions .csv
-write.csv(
-  interactions_final,
-  here("interactions_final.csv"),
-  row.names = FALSE
-)
+write.csv(interactions_final,"03.Output/interactions_final.csv", row.names = FALSE)
 
 
 ############################### END ##########################################
