@@ -26,7 +26,6 @@ rm(list = ls())
 #install.packages("sf")
 #install.packages("rnaturalearth")
 #install.packages("CoordinateCleaner")
-#install.packages("here")
 #install.packages("stringi")
 
 # Loading Packages --------------------------------------------------------
@@ -37,12 +36,10 @@ library(rfishbase)         # FishBase data access - taxonomy tools
 library(sf)                # Spatial data handling
 library(CoordinateCleaner) # Coordinate cleaning
 library(rnaturalearth)     # World Map Data from Natural Earth
-library(here)              # Reproducible file paths
 library(stringi)           # Text standardization
 
 
 # Import Database ----------------------------------------------------------
-# here(): find your project’s files
 
 popul <- read.csv("02.Raw_Data/Populations_merged.csv")         #Population Data
 trophic_int <- read.csv("02.Raw_Data/Interactions_merged.csv")  #Interactions Data
