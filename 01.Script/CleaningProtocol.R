@@ -44,8 +44,8 @@ library(stringi)           # Text standardization
 # Import Database ----------------------------------------------------------
 # here(): find your project’s files
 
-popul <- read.csv(here("Populations_merged.csv"))         #Population Data
-trophic_int <- read.csv(here("Interactions_merged.csv"))  #Interactions Data
+popul <- read.csv("02.Raw_Data/Populations_merged.csv")         #Population Data
+trophic_int <- read.csv("02.Raw_Data/Interactions_merged.csv")  #Interactions Data
 
 
 # Data Structure and Summary ----------------------------------------------
