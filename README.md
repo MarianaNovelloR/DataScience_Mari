@@ -85,7 +85,7 @@ The `categories_manual.csv` dataset contains manually assigned prey classificati
 | Column | Description |
 |---|---|
 | `Prey` | Prey item identified in the interaction database. |
-| `Category` | Manually assigned prey category used as the reference classification. |
+| `Categories_general` | Manually assigned prey category used as the reference classification. |
 
 ## Workflow
 
