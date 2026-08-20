@@ -23,7 +23,7 @@ Large-scale databases often rely on manually extracted data, which can contain t
 
 ### Interactions Dataset
 
-The `interactions_final.csv` dataset contains standardized information on predator–prey interactions extracted from the original trophic web database. Each row represents a trophic interaction between a fish population and a prey item.
+The `interactions_final.csv` dataset contains standardized information on predator–prey interactions. Each row represents a trophic interaction between a fish population and a prey item.
 
 | Column | Description |
 |---|---|
