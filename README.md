@@ -114,7 +114,7 @@ The LLM classifies prey items into six predefined categories:
 
 ## Software and Package Versions
 
-This workflow was developed using R version 4.6.1. The R packages used in the workflow and their versions are listed below.
+This workflow was developed using R version 4.6.1. Package dependencies were managed using `renv`, and the R packages used in the workflow and their versions are listed below. The LLM-assisted classification step uses the Google Gemini API with the `gemini-3.6-flash` model.
 
 | Package | Version | Purpose |
 |---|---|---|
