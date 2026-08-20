@@ -2,9 +2,8 @@
 # Project: Large Language Model
 # Author: Mariana Novello
 
-# Overview: Develop a LLM-based classification and
-# standardize heterogeneous food-item descriptions into predefined
-# ecological categories
+# Overview: Develop a LLM-based classification and standardize heterogeneous 
+# food-item descriptions into predefined categories
 
 
 # Empty your environment --------------------------------------------------
@@ -17,16 +16,18 @@ rm(list = ls())
 #install.packages("ellmer")
 # install.packages("usethis")
 
+
 # Loading Packages --------------------------------------------------------
 
 library(ellmer)            # For interacting with AI
 library(usethis)           # For managing environment variables
 
+
 # Import Database ---------------------------------------------------------
-# here(): find your project’s files
 
 int_data <- read.csv("03.Output/interactions_final.csv")  # Interactions Data Cleaned
 manual_classific <- read.csv("02.Raw_Data/categories_manual.csv") # Data with manual classifications to compare with the model's output
+
 
 # Setting Gemini API ------------------------------------------------------
 
@@ -43,7 +44,6 @@ Sys.getenv("GEMINI_API_KEY")
 
 # Initializing Gemini chat and specifying the model version ---------------
 # chat_google_gemini(): To chat with Google Gemini in R
-
 chat <- chat_google_gemini(
   model = "gemini-3.6-flash",
   system_prompt = " You are an expert in freshwater fish ecology, 
@@ -89,8 +89,7 @@ chat$chat("classify ephemeroptera")
 
 # Applying it to our dataset ----------------------------------------------
 
-# Extract unique prey items
-
+# Extract unique prey items in the dataset
 all_prey <- unique(int_data$Prey)
 
 
@@ -100,12 +99,12 @@ all_prey <- unique(int_data$Prey)
 # previous runs, avoiding unnecessary API calls and reducing processing time 
 # (its called cache because I lost the data before).
 
-prev_classification <- "03.Output/prey_classification_cache.csv"
+cache_file <- "03.Output/prey_classification_cache.csv"
 
-if (file.exists(prev_classification)) {
+if (file.exists(cache_file)) {
   
   prev_classification <- read.csv(
-    prev_classification,
+    cache_file,
     stringsAsFactors = FALSE
   )
   
@@ -132,7 +131,9 @@ cat(
 )
 
 
-# Split prey into batches -------------------------------------------------
+# Model -------------------------------------------------------------------
+
+# Split prey into batches
 
 # Note: I did that because the model has a limit on the number of tokens
 # it can process in a single request. So this was the way I found to avoid
@@ -146,7 +147,7 @@ batches <- split(
 )
 
 
-# Function to classify a batch --------------------------------------------
+# Function to classify a batch 
 
 classify_batch <- function(prey_batch) {
   
@@ -174,12 +175,11 @@ Prey items:
 # but I maintained it just to make sure it was going to follow the rules.
 
 
-# Store classifications ---------------------------------------------------
-
+# Store classifications 
 prey_classification <- character()
 
 
-# Classify batches --------------------------------------------------------
+# Classify batches (if there are any prey items to classify)
 
 if (length(prey_unique) > 0) {
   
@@ -209,12 +209,35 @@ if (length(prey_unique) > 0) {
         
         categories <- trimws(categories)
         
+        # Check that the model returned one category per prey item
+        
+        if (length(categories) != length(batches[[i]])) {
+          stop(
+            "Number of categories returned does not match number of prey items."
+          )
+        }
+        
+        # Check that all returned categories are valid
+        
+        valid_categories <- c(
+          "Fish",
+          "Invertebrate",
+          "Plant",
+          "Algae",
+          "Detritus",
+          "Other"
+        )
+        
+        if (!all(categories %in% valid_categories)) {
+          stop("Invalid category returned by the model.")
+        }
+        
         prey_classification <- c(
           prey_classification,
           categories
         )
         
-        # Save partial results after every batch -------------------------
+        # Save partial results after every batch 
         
         partial_results <- data.frame(
           Prey = unlist(
@@ -233,9 +256,13 @@ if (length(prey_unique) > 0) {
         
         write.csv(
           updated_cache,
-          cache_file1,
+          cache_file,
           row.names = FALSE
         )
+        
+        # Update the classifications stored in the current session
+        
+        prev_classification <- updated_cache
         
         success <- TRUE
         
@@ -260,45 +287,44 @@ if (length(prey_unique) > 0) {
 }
 
 
-# Add category to original dataset 
-
+# Add the new categories to the original data 
 int_data$LLM_Category <- prev_classification$Category[
-  match(
-    int_data$Prey,
-    prev_classification$Prey
-  )
-]
+  match(int_data$Prey,prev_classification$Prey)]
 
 
 # Check results 
-
 table(int_data$LLM_Category)
 
 
-# Check with my classifica
+# Compare LLM and manual classifications ----------------------------------
 
+# Keep only one classification record per prey item in the manual dataset
+manual_unique <- unique(manual_classific[, c("Prey", "Categories_general")])
 
-# Merge by prey item
+# Keep only one classification record per prey item in the LLM output
+int_unique <- unique(int_data[, c("Prey","LLM_Category")])
 
-comparison <- merge(
-  manual_classific [, c("Prey", "Categories_general")],
-  int_data [, c("Prey", "LLM_Category")],
-  by = "Prey"
-)
+# Match manual and LLM classifications using the prey item description
+comparison <- merge(manual_unique,int_unique,by = "Prey")
 
-comparison
 # Calculate accuracy
+accuracy <- mean(comparison$Categories_general == comparison$LLM_Category)
 
-accuracy <- mean(
-  comparison$Categories_general ==
-    comparison$LLM_Category
-)
+cat("\nOverall Accuracy:", round(accuracy * 100, 2), "%\n")
 
-cat(
-  "\nOverall Accuracy:",
-  round(accuracy * 100, 2),
-  "%\n"
-)
+# Cases where the model disagrees with the manual classification
+errors <- comparison[comparison$Categories_general !=comparison$LLM_Category,]
+cat("\nNumber of disagreements:",nrow(errors),"\n")
+
+View(errors)
+
+# Note: After inspecting the disagreements between the manual and LLM
+# classifications, most errors did not seem unreasonable. Many cases were
+# inherently ambiguous and could plausibly fit more than one ecological
+# category. In several instances the model appeared to generalize prey items
+# more broadly than I would have done manually, which led to some
+# disagreements. Overall, however, the classifications were more accurate
+# and biologically consistent than I initially expected.
 
 
-#sAVE OUTPUT
+################################# END #######################################
