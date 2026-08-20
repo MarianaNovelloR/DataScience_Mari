@@ -1,2 +1,3 @@
-# DataScience_Mari
-Repository for Data Science in R discipline.
+# Biology 835AQ – Data Science in Ecology_MNR
+
+##Project Description
