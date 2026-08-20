@@ -15,13 +15,11 @@ rm(list = ls())
 # Install Packages (if needed) --------------------------------------------
 
 #install.packages("ellmer")
-#install.packages("here")
 # install.packages("usethis")
 
 # Loading Packages --------------------------------------------------------
 
 library(ellmer)            # For interacting with AI
-library(here)              # Reproducible file paths
 library(usethis)           # For managing environment variables
 
 # Import Database ---------------------------------------------------------
@@ -102,18 +100,18 @@ all_prey <- unique(int_data$Prey)
 # previous runs, avoiding unnecessary API calls and reducing processing time 
 # (its called cache because I lost the data before).
 
-cache_file1 <- "prey_classification_cache.csv"
+prev_classification <- "03.Output/prey_classification_cache.csv"
 
-if (file.exists(cache_file1)) {
+if (file.exists(prev_classification)) {
   
-  cache <- read.csv(
-    cache_file1,
+  prev_classification <- read.csv(
+    prev_classification,
     stringsAsFactors = FALSE
   )
   
 } else {
   
-  cache <- data.frame(
+  prev_classification <- data.frame(
     Prey = character(),
     Category = character(),
     stringsAsFactors = FALSE
@@ -123,14 +121,11 @@ if (file.exists(cache_file1)) {
 
 # Select only prey items that have not been classified before
 
-prey_unique <- setdiff(
-  all_prey,
-  cache$Prey
-)
+prey_unique <- setdiff(all_prey, prev_classification$Prey)
 
 cat(
   "\nPreviously classified items:",
-  nrow(cache),
+  nrow(prev_classification),
   "\nItems remaining to classify:",
   length(prey_unique),
   "\n"
@@ -231,14 +226,14 @@ if (length(prey_unique) > 0) {
         
         updated_cache <- unique(
           rbind(
-            cache,
+            prev_classification,
             partial_results
           )
         )
         
         write.csv(
           updated_cache,
-          cache_file,
+          cache_file1,
           row.names = FALSE
         )
         
@@ -265,101 +260,38 @@ if (length(prey_unique) > 0) {
 }
 
 
-# Reload updated cache ----------------------------------------------------
+# Add category to original dataset 
 
-classification_table <- read.csv(
-  cache_file,
-  stringsAsFactors = FALSE
-)
-
-
-# Add category to original dataset ----------------------------------------
-
-int_data$LLM_Category <- classification_table$Category[
+int_data$LLM_Category <- prev_classification$Category[
   match(
     int_data$Prey,
-    classification_table$Prey
+    prev_classification$Prey
   )
 ]
 
 
-# Check results -----------------------------------------------------------
+# Check results 
 
-table(
-  int_data$LLM_Category,
-  useNA = "ifany"
-)
+table(int_data$LLM_Category)
 
 
-# View classifications ----------------------------------------------------
+# Check with my classifica
 
-View(classification_table)
-
-View(
-  int_data[, c("Prey", "LLM_Category")]
-)
-
-
-# Save outputs ------------------------------------------------------------
-
-write.csv(
-  classification_table,
-  "prey_lookup.csv",
-  row.names = FALSE
-)
-
-write.csv(
-  int_data,
-  "interactions_final_classified.csv",
-  row.names = FALSE
-)
-
-
-
-
-# Read manual classifications
-
-manual_table <- read.csv(
-  "categories_manual.csv",
-  stringsAsFactors = FALSE
-)
-
-# Read LLM classifications
-
-llm_table <- read.csv(
-  "prey_lookup.csv",
-  stringsAsFactors = FALSE
-)
 
 # Merge by prey item
 
 comparison <- merge(
-  manual_table,
-  llm_table,
+  manual_classific [, c("Prey", "Categories_general")],
+  int_data [, c("Prey", "LLM_Category")],
   by = "Prey"
 )
 
-# Standardize category names
-
-comparison$Categories_general <- tolower(
-  comparison$Categories_general
-)
-
-comparison$Category <- tolower(
-  comparison$Category
-)
-
-# Fix plural form
-
-comparison$Categories_general[
-  comparison$Categories_general == "invertebrates"
-] <- "invertebrate"
-
+comparison
 # Calculate accuracy
 
 accuracy <- mean(
   comparison$Categories_general ==
-    comparison$Category
+    comparison$LLM_Category
 )
 
 cat(
@@ -367,3 +299,6 @@ cat(
   round(accuracy * 100, 2),
   "%\n"
 )
+
+
+#sAVE OUTPUT
