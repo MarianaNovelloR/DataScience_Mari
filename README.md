@@ -8,7 +8,8 @@ Large-scale databases often rely on manually extracted data, which can contain t
 ### 01.Script
 - `CleaningProtocol/` – Scripts for data cleaning, validation, and standardization.
 - `LLM/` – Script for LLM-assisted classification of prey items.
-
+- `Renv/` - Lock file of versions of packages.
+  
 ### 02.Raw_Data
 - `Interactions_merged.csv` – Original interaction data compiled from multiple sources.
 - `Population_merged.csv` – Original population data compiled from multiple sources.
@@ -111,6 +112,22 @@ The LLM classifies prey items into six predefined categories:
 - **Algae** – Algae or algal material.
 - **Detritus** – Organic detrital material.
 - **Other** – Items that do not fit into the categories above.
+
+## Software and Package Versions
+
+This workflow was developed using R version 4.6.1. The R packages used in the workflow and their versions are listed below. Renv 
+
+| Package | Version | Purpose |
+|---|---|---|
+| `tidyverse` | 2.0.0 | Data manipulation, cleaning, and processing. |
+| `stringdist` | 0.9.17 | Calculate string similarity to identify potential typographical errors. |
+| `rfishbase` | 5.0.3 | Access FishBase data for taxonomic validation and enrichment. |
+| `sf` | 1.1-2 | Handle and validate spatial data. |
+| `CoordinateCleaner` | 3.0.1 | Identify potential errors in geographic coordinates. |
+| `rnaturalearth` | 1.2.0 | Access country boundaries for spatial validation. |
+| `stringi` | 1.8.7 | Standardize text and remove accents. |
+| `ellmer` | 0.4.2 | Interact with the Gemini API for LLM-assisted prey classification. |
+| `usethis` | 3.2.1 | Manage environment variables and the `.Renviron` file. |
 
 ## Contact
   
