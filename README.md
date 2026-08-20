@@ -8,7 +8,6 @@ Large-scale databases often rely on manually extracted data, which can contain t
 ### 01.Script
 - `CleaningProtocol/` – Scripts for data cleaning, validation, and standardization.
 - `LLM/` – Script for LLM-assisted classification of prey items.
-- `Renv/` - Lock file of versions of packages.
   
 ### 02.Raw_Data
 - `Interactions_merged.csv` – Original interaction data compiled from multiple sources.
@@ -115,7 +114,7 @@ The LLM classifies prey items into six predefined categories:
 
 ## Software and Package Versions
 
-This workflow was developed using R version 4.6.1. The R packages used in the workflow and their versions are listed below. Renv 
+This workflow was developed using R version 4.6.1. The R packages used in the workflow and their versions are listed below.
 
 | Package | Version | Purpose |
 |---|---|---|
