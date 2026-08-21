@@ -596,7 +596,6 @@ int_typo_final <- int_species_typo %>%
     Index = recode(Index,
                    'FO (%)' = '%FO',
                    'FO%' = '%FO', 
-                   'FO%' = '%FO',
                    'Fo%' = '%FO',
                    'AI%' = '%IAi', 
                    'Ali%' = '%IAi',
