@@ -41,6 +41,7 @@ library(stringi)           # Text standardization
 
 
 # Load utility functions --------------------------------------------------
+
 source("01.Script/Utils.R") 
 
 
@@ -559,9 +560,9 @@ pop_tax <- add_taxonomy(pop_tax, taxa)
 int_tax <- add_taxonomy(int_tax, taxa)
 
 
-# Saving Cleaned Datasets -------------------------------------------------
+# Final Cleaned Datasets --------------------------------------------------
 
-# Creating new Objects just to organize the final Datasets
+# Create final dataset objects after all cleaning, validation, and taxonomic standardization steps have been completed
 interactions_final <- int_tax
 population_final <- pop_tax
 
