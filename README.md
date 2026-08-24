@@ -6,9 +6,10 @@ Large-scale databases often rely on manually extracted data, which can contain t
 ## Repository Structure
 
 ### 01.Script
-- `CleaningProtocol/` – Scripts for data cleaning, validation, and standardization.
-- `LLM/` – Script for LLM-assisted classification of prey items.
-  
+- `CleaningProtocol.R` – Script for data cleaning, validation, and standardization.
+- `LLM_New.R` – Script for LLM-assisted classification of prey items.
+- `Utils.R` – Script that contains reusable functions used throughout the cleaning workflow. These functions perform tasks such as text standardization, typo detection and correction, taxonomic validation, and taxonomy enrichment. The file is automatically loaded by the cleaning protocol using `source()`, and therefore does not need to be executed separately.
+
 ### 02.Raw_Data
 - `Interactions_merged.csv` – Original interaction data compiled from multiple sources.
 - `Population_merged.csv` – Original population data compiled from multiple sources.
