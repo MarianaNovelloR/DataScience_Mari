@@ -158,3 +158,189 @@ create_manual_review <- function(df, categories) {
   
   return(manual_review)
 }
+
+# Species Typo Suggestions -----------------------------------------------
+# Create a function to find possible species name corrections using FishBase
+
+find_species_typos <- function(df, fish_species_names) {
+  
+  invalid_species <- df %>%
+    filter(!Species %in% fish_species_names) %>%
+    select(Species) %>%
+    distinct()
+  
+  typo_suggestions <- data.frame()
+  
+  for (species_name in invalid_species$Species) {
+    
+    similarity <- stringsim(
+      species_name,
+      fish_species_names,
+      method = "jw"
+    )
+    
+    best_index <- which.max(similarity)
+    
+    typo_suggestions <- rbind(
+      typo_suggestions,
+      data.frame(
+        Original_name = species_name,
+        Suggested_name = fish_species_names[best_index],
+        Similarity = round(
+          similarity[best_index],
+          3
+        )
+      )
+    )
+  }
+  
+  return(typo_suggestions)
+}
+
+
+# Species Automatic Correction -------------------------------------------
+# Create a function to automatically correct species names based on a selected similarity threshold
+
+apply_species_corrections <- function(
+    df,
+    typo_suggestions,
+    threshold = 0.95
+) {
+  
+  corrected_df <- df
+  
+  for (i in seq_len(nrow(typo_suggestions))) {
+    
+    if (typo_suggestions$Similarity[i] >= threshold) {
+      
+      old_name <- typo_suggestions$Original_name[i]
+      
+      new_name <- typo_suggestions$Suggested_name[i]
+      
+      corrected_df$Species[
+        corrected_df$Species == old_name
+      ] <- new_name
+    }
+  }
+  
+  return(corrected_df)
+}
+
+# Taxonomic Validation ---------------------------------------------------
+# Validate species names using FishBase while retaining the original name
+# whenever FishBase does not return a match.
+
+validate_species_taxonomy <- function(df) {
+  
+  species_validation <- tibble(
+    Species = unique(df$Species),
+    Species_valid = validate_names(
+      unique(df$Species)
+    )
+  )
+  
+  species_validation <- species_validation %>%
+    mutate(
+      Species_valid = if_else(
+        is.na(Species_valid),
+        Species,
+        Species_valid
+      )
+    )
+  
+  df <- df %>%
+    left_join(
+      species_validation,
+      by = "Species"
+    ) %>%
+    select(-Species) %>%
+    rename(
+      Species = Species_valid
+    )
+  
+  return(df)
+}
+
+# Taxonomy Enrichment ----------------------------------------------------
+# Add taxonomic information from FishBase and solve missing taxonomy
+# values using genus-level classification.
+
+add_taxonomy <- function(df, taxa) {
+  
+  species_tax <- taxa %>%
+    filter(
+      Species %in% unique(df$Species)
+    ) %>%
+    select(
+      Species,
+      Genus,
+      Family,
+      Order,
+      Class
+    )
+  
+  df <- df %>%
+    left_join(
+      species_tax,
+      by = "Species"
+    )
+  
+  # Solving NAs problem
+  df <- df %>%
+    mutate(
+      Genus_search = word(Species, 1)
+    )
+  
+  df <- df %>%
+    mutate(
+      Genus = if_else(
+        is.na(Genus),
+        Genus_search,
+        Genus
+      )
+    )
+  
+  genus_tax <- taxa %>%
+    select(
+      Genus,
+      Family,
+      Order,
+      Class
+    ) %>%
+    distinct(
+      Genus,
+      .keep_all = TRUE
+    )
+  
+  df <- df %>%
+    left_join(
+      genus_tax,
+      by = "Genus",
+      suffix = c("", "_genus")
+    ) %>%
+    mutate(
+      Family = if_else(
+        is.na(Family),
+        Family_genus,
+        Family
+      ),
+      Order = if_else(
+        is.na(Order),
+        Order_genus,
+        Order
+      ),
+      Class = if_else(
+        is.na(Class),
+        Class_genus,
+        Class
+      )
+    ) %>%
+    select(
+      -ends_with("_genus"),
+      -Genus_search
+    )
+  
+  return(df)
+}
+
+

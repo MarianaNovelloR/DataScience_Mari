@@ -28,6 +28,7 @@ rm(list = ls())
 #install.packages("CoordinateCleaner")
 #install.packages("stringi")
 
+
 # Loading Packages --------------------------------------------------------
 
 library(tidyverse)         # Data manipulation and visualization
@@ -40,7 +41,8 @@ library(stringi)           # Text standardization
 
 
 # Load utility functions --------------------------------------------------
-source("01.Script/UtilsR.R") 
+source("01.Script/Utils.R") 
+
 
 # Import Database ----------------------------------------------------------
 
@@ -67,6 +69,7 @@ colSums(is.na(trophic_int))
 # with an explicit value. We can also see that some variables need to be changed 
 # to the appropriate data type.
 
+
 # Data Type Standardization  ----------------------------------------------
 # Ensure appropriate variable classes
 
@@ -74,6 +77,7 @@ colSums(is.na(trophic_int))
 trophic_int$Strength <- as.numeric(trophic_int$Strength)
 popul$YearStart <- as.numeric(popul$YearStart)
 popul$YearEnd <- as.numeric(popul$YearEnd)
+
 
 # Variable Selection  -----------------------------------------------------
 # Select(): Keep or drop columns using variables names and types
@@ -118,28 +122,22 @@ int_reduced <- mutate(int_reduced,
 # Population Data
 pop_textclean <- clean_text(
   pop_reduced,
-  cols_to_lower = c(
-    "Type",
-    "Habitat"
-  )
-)
+  cols_to_lower = c("Type","Habitat"))
 
 # Interaction Data
 int_textclean <- clean_text(
   int_reduced,
-  cols_to_lower = c(
-    "Quantified_at_the",
-    "Sampled_at_the",
-    "Method",
-    "Source",
-    "Origin",
-    "Category"
-  )
-)
+  cols_to_lower = c("Quantified_at_the",
+                    "Sampled_at_the",
+                    "Method",
+                    "Source",
+                    "Origin",
+                    "Category"))
 
 # Note: Species and Locality were not converted to lowercase
 # at this stage to avoid interfering with subsequent taxonomic and
 # coordinate validation.
+
 
 # Checking categories for typos -------------------------------------------
 # lapply(): applies a function across all columns
@@ -153,6 +151,7 @@ lapply(int_textclean, unique)
 
 # Note: The data contains typos, values assigned to the wrong columns, and
 # incorrect dates that are in the future.
+
 
 # Fixing swapped classifications ------------------------------------------
 # filter(): select a subset of rows from a data frame
@@ -175,11 +174,12 @@ pop_typo <- pop_textclean %>%
   select(-temp) # Remove the temporary column after the correction
 
 
-# Typo Correction (automatic version) -------------------------------------
+# Typo Correction (automatic) ---------------------------------------------
 # Applied to variables with predefined categories
 
 # Creating the categories for each variable 
 # list(): creates a list
+
 # Population Data
 pop_categories <- list(
   Type = c("freshwater", "marine", "estuarine"),
@@ -196,6 +196,7 @@ int_categories <- list(
 # Filter invalid values
 # filter(): in this case identifies rows containing invalid values based on the predefined categories
 # distinct(): returns only unique combinations of the filtered values
+
 # Population Data 
 pop_invalid_values <- pop_typo %>%
   filter(
@@ -218,178 +219,68 @@ int_invalid_values <- int_textclean %>%
   distinct()
 
 
-# Find possible corrections using string similarity
-# stringsim(): calculates the similarity between the invalid value and valid categories
-# which.max(): identifies the category with the highest similarity
-# Used Jaro-Winkler ("jw") similarity because it performs well for detecting typos in short categorical values
+# Find possible corrections using string similarity 
+# The find_typo_suggestions() function (stored in Utils.R) was used to identify possible corrections based on string similarity
 
 # Population Data
-pop_typo_suggestions <- data.frame()
-
-for (col in names(pop_categories)) {
-  
-  invalid <- pop_invalid_values[[col]]
-  invalid <- unique(invalid[!is.na(invalid)])
-  
-  for (value in invalid) {
-    
-    if (!(value %in% pop_categories[[col]])) {
-      
-      similarity <- stringsim(
-        value,
-        pop_categories[[col]],
-        method = "jw"
-      )
-      
-      best_index <- which.max(similarity)
-      best_match <- pop_categories[[col]][best_index]
-      best_similarity <- similarity[best_index]
-      
-      pop_typo_suggestions <- rbind(
-        pop_typo_suggestions,
-        data.frame(
-          Variable = col,
-          Invalid_value = value,
-          Possible_match = best_match,
-          Similarity = round(best_similarity, 3)))}}}
+pop_typo_suggestions <- find_typo_suggestions(
+  pop_invalid_values,
+  pop_categories
+)
 
 pop_typo_suggestions
 
 # Interactions Data
-typo_suggestions_int <- data.frame()
-
-for (col in names(int_categories)) {
-  
-  invalid <- int_invalid_values[[col]]
-  invalid <- unique(invalid[!is.na(invalid)])
-  
-  for (value in invalid) {
-    
-    if (!(value %in% int_categories[[col]])) {
-      
-      similarity <- stringsim(
-        value,
-        int_categories[[col]],
-        method = "jw"
-      )
-      
-      best_index <- which.max(similarity)
-      best_match <- int_categories[[col]][best_index]
-      best_similarity <- similarity[best_index]
-      
-      typo_suggestions_int <- rbind(
-        typo_suggestions_int,
-        data.frame(
-          Variable = col,
-          Invalid_value = value,
-          Possible_match = best_match,
-          Similarity = round(best_similarity, 3)
-        )
-      )
-    }
-  }
-}
+typo_suggestions_int <- find_typo_suggestions(
+  int_invalid_values,
+  int_categories
+)
 
 typo_suggestions_int
 
-
 # Automatically correct high-similarity matches
+# The apply_typo_corrections() function (stored in Utils.R) was used to automatically correct high-confidence matches
+
+# Population Data
+pop_typo <- apply_typo_corrections(
+  pop_typo,
+  pop_typo_suggestions,
+  threshold = 0.80
+)
+
+# Interactions Data
+int_typo <- apply_typo_corrections(
+  int_textclean,
+  typo_suggestions_int,
+  threshold = 0.80
+)
+
 # Note: Check the categories before choosing the similarity threshold.
 # I chose the 0.80 threshold after reviewing the suggested matches.
 # In my case, values below 0.80 often resulted in incorrect corrections,
 # so I decided to keep them for manual review.
 
-# Population Data
-for (i in 1:nrow(pop_typo_suggestions)) {
-  
-  if (pop_typo_suggestions$Similarity[i] >= 0.80) {
-    
-    col <- pop_typo_suggestions$Variable[i]
-    old_value <- pop_typo_suggestions$Invalid_value[i]
-    new_value <- pop_typo_suggestions$Possible_match[i]
-    
-    pop_typo[[col]][pop_typo[[col]] == old_value] <- new_value
-  }
-}
-
-# Interactions Data
-int_typo <- int_textclean #Created a new object just to see the progress
-
-for (i in 1:nrow(typo_suggestions_int)) {
-  
-  if (typo_suggestions_int$Similarity[i] >= 0.80) {
-    
-    col <- typo_suggestions_int$Variable[i]
-    old_value <- typo_suggestions_int$Invalid_value[i]
-    new_value <- typo_suggestions_int$Possible_match[i]
-    
-    int_typo[[col]][int_typo[[col]] == old_value] <- new_value
-  }
-}
-
 # Filter remaining invalid values for manual review
-# Values that didn't match the predefined categories were kept for manual review
+# The create_manual_review() function (stored in Utils.R) was used to identify values that still require manual review
 
 # Population Data
-pop_manual_review <- data.frame()
-
-for (col in names(pop_categories)) {
-  
-  invalid <- unique(pop_typo[[col]])
-  invalid <- invalid[!is.na(invalid)]
-  
-  invalid <- invalid[!invalid %in% pop_categories[[col]]]
-  
-  if (length(invalid) > 0) {
-    
-    pop_manual_review <- rbind(
-      pop_manual_review,
-      data.frame(
-        Variable = col,
-        Invalid_value = invalid
-      )
-    )
-  }
-}
+pop_manual_review <- create_manual_review(
+  pop_typo,
+  pop_categories
+)
 
 pop_manual_review # check remaining typos
 
-#Interactions Data
-int_manual_review <- data.frame()
-
-for (col in names(int_categories)) {
-  
-  invalid <- unique(int_typo[[col]])
-  invalid <- invalid[!is.na(invalid)]
-  
-  invalid <- invalid[!invalid %in% int_categories[[col]]]
-  
-  if (length(invalid) > 0) {
-    
-    int_manual_review <- rbind(
-      int_manual_review,
-      data.frame(
-        Variable = col,
-        Invalid_value = invalid
-      )
-    )
-  }
-}
+# Interactions Data
+int_manual_review <- create_manual_review(
+  int_typo,
+  int_categories
+)
 
 int_manual_review # check remaining typos
 
-# Note: Values that were not correctly matched by stringdist can be 
-# manually corrected. I also tried to implement the yes/no approach you 
-# suggested for accepting or rejecting each match.However, I could not make it 
-# work as effectively as I wanted. So, I opted to validate the suggestions based 
-# on the  similarity. If you think the yes/no approach would be more practical, 
-# I can try implementing it again.
 
-
-# Typo Correction - Species (automatic version) ---------------------------
-
-# Note: The same stringdist approach was used for species names, but this
-# step was separated to make the workflow clearer.
+# Species Typo Correction (automatic) -------------------------------------
 
 # FishBase species names were used as a reference "dictionary" to identify
 # possible typos mistakes before taxonomic validation.
@@ -398,136 +289,67 @@ int_manual_review # check remaining typos
 taxa <- species_names()
 fish_species_names <- unique(taxa$Species)
 
+# Find possible species name corrections
+# The find_species_typos() function (stored in Utils.R) was used to identify possible corrections based on FishBase species names
+
 # Population Data
-# Find species names that are not exact matches to FishBase
-pop_invalid_species <- pop_typo %>%
-  filter(!Species %in% fish_species_names) %>%
-  select(Species) %>%
-  distinct()
+pop_species_typo_suggestions <- find_species_typos(
+  pop_typo,
+  fish_species_names
+)
 
-# Create an empty table to store suggestions
-pop_species_typo_suggestions <- data.frame()
-
-# Find the closest FishBase match for each invalid name
-for (species_name in pop_invalid_species$Species) {
-  
-  similarity <- stringsim(
-    species_name,
-    fish_species_names,
-    method = "jw"
-  )
-  
-  best_index <- which.max(similarity)
-  
-  best_match <- fish_species_names[best_index]
-  
-  best_similarity <- similarity[best_index]
-  
-  pop_species_typo_suggestions <- rbind(
-    pop_species_typo_suggestions,
-    data.frame(
-      Original_name = species_name,
-      Suggested_name = best_match,
-      Similarity = round(best_similarity, 3)
-    )
-  )
-}
-
-# Check suggested corrections
 pop_species_typo_suggestions
+
+# Interactions Data
+int_species_typo_suggestions <- find_species_typos(
+  int_typo,
+  fish_species_names
+)
+
+int_species_typo_suggestions
 
 
 # Automatically correct high-confidence matches
-pop_species_typo <- pop_typo
+# The apply_species_corrections() function (stored in Utils.R) was used to automatically correct high-confidence matches
 
-for (i in seq_len(nrow(pop_species_typo_suggestions))) {
-  
-  if (pop_species_typo_suggestions$Similarity[i] >= 0.95) {
-    
-    old_name <- pop_species_typo_suggestions$Original_name[i]
-    
-    new_name <- pop_species_typo_suggestions$Suggested_name[i]
-    
-    pop_species_typo$Species[
-      pop_species_typo$Species == old_name
-    ] <- new_name
-  }
-}
+# Population Data
+pop_species_typo <- apply_species_corrections(
+  pop_typo,
+  pop_species_typo_suggestions,
+  threshold = 0.95
+)
+
+# Interactions Data
+int_species_typo <- apply_species_corrections(
+  int_typo,
+  int_species_typo_suggestions,
+  threshold = 0.95
+)
+
 
 # Species that still require manual review
+# Population Data
 pop_species_manual_review <- pop_species_typo_suggestions %>%
   filter(Similarity < 0.95)
 
 pop_species_manual_review # check remaining typos
 
-# Interactions Data 
-# Find species names that are not exact matches to FishBase
-int_invalid_species <- int_typo %>%
-  filter(!Species %in% fish_species_names) %>%
-  select(Species) %>%
-  distinct()
-
-# Create an empty table to store suggestions
-int_species_typo_suggestions <- data.frame()
-
-# Find the closest FishBase match for each invalid name
-for (species_name in int_invalid_species$Species) {
-  
-  similarity <- stringsim(
-    species_name,
-    fish_species_names,
-    method = "jw"
-  )
-  
-  best_index <- which.max(similarity)
-  
-  best_match <- fish_species_names[best_index]
-  
-  best_similarity <- similarity[best_index]
-  
-  int_species_typo_suggestions <- rbind(
-    int_species_typo_suggestions,
-    data.frame(
-      Original_name = species_name,
-      Suggested_name = best_match,
-      Similarity = round(best_similarity, 3)
-    )
-  )
-}
-
-# Check suggested corrections
-int_species_typo_suggestions
-
-# Automatically correct high-confidence matches
-int_species_typo <- int_typo
-
-for (i in seq_len(nrow(int_species_typo_suggestions))) {
-  
-  if (int_species_typo_suggestions$Similarity[i] >= 0.95) {
-    
-    old_name <- int_species_typo_suggestions$Original_name[i]
-    
-    new_name <- int_species_typo_suggestions$Suggested_name[i]
-    
-    int_species_typo$Species[
-      int_species_typo$Species == old_name
-    ] <- new_name
-  }
-}
-
-# Species that still require manual review
+# Interactions Data
 int_species_manual_review <- int_species_typo_suggestions %>%
   filter(Similarity < 0.95)
 
-int_species_manual_review  # check remaining typos
+int_species_manual_review # check remaining typos
 
-# Note: Its important to check the suggested matches before choosing the similarity
-# threshold. Species names are compared against thousands of FishBase
-# records, so a more conservative threshold is recommended.
-# I chose 0.95 after checking the suggested matches (for both datasets). 
-# There were several species names with similarities between 0.90 and 0.94 that 
-# were matched incorrectly. Some correct matches also had similarities below 0.95, but
-# I preferred to review these manually rather than risk incorrect corrections.
+
+# Note: It is important to check the suggested matches before choosing
+# the similarity threshold. The threshold value is passed to the
+# apply_species_corrections() function.
+
+# I chose 0.95 after checking the suggested matches (for both datasets).
+# There were several species names with similarities between 0.90 and
+# 0.94 that were matched incorrectly. Some correct matches also had
+# similarities below 0.95, but I preferred to review these manually
+# rather than risk incorrect corrections.
 
 
 # Typo Correction (manual version) ----------------------------------------
@@ -632,6 +454,7 @@ pop_coord <- select( pop_coord,
                      -lat_d, -lat_m, -lat_s, -lat_dir,
                      -lon_d, -lon_m, -lon_s, -lon_dir)
 
+
 # Coordinate Validation ---------------------------------------------------
 
 # Note: Records containing NAs were excluded because they interfere
@@ -706,56 +529,18 @@ pop_points %>%
 
 # Taxonomic Validation ----------------------------------------------------
 
-# Note: FishBase validate_names() does not recognize species identified 
+# Note: FishBase validate_names() does not recognize species identified
 # only at the genus level or with taxonomic qualifiers (gr., aff., cf.).
-# To avoid NAs in these cases, species names were validated while keeping 
-# the original names in a separate column. When no match was found in FishBase, 
-# the original name was retained. 
+# To avoid NAs in these cases, species names were validated while keeping
+# the original names whenever no FishBase match was found.
+
+# The validate_species_taxonomy() function (stored in Utils.R) was used to perform species name validation.
 
 # Population Data
-# Validate species names
-species_validation <- tibble(
-  Species = unique(pop_coord$Species),
-  Species_valid = validate_names(unique(pop_coord$Species)))
+pop_tax <- validate_species_taxonomy(pop_coord)
 
-# Keep the original name when FishBase does not find a match
-species_validation <- species_validation %>%
-  mutate(
-    Species_valid = if_else(
-      is.na(Species_valid),
-      Species,
-      Species_valid))
-
-# Add validated names as a new column to the dataset
-pop_tax <- pop_coord %>%
-  left_join(species_validation, by = "Species")
-
-# Remove the original Species column and rename the validated species column
-pop_tax <- pop_tax %>%
-  select(-Species) %>%
-  rename(Species = Species_valid)
-
-#Interaction Data
-# Validate species names
-species_validation <- tibble(
-  Species = unique(int_typo_final$Species),
-  Species_valid = validate_names(unique(int_typo_final$Species)))
-
-# Keep the original name when FishBase does not find a match
-species_validation <- mutate(species_validation, 
-                             Species_valid = if_else
-                             (is.na(Species_valid), 
-                               Species, Species_valid))
-
-
-# Add validated names as a new column to the dataset
-int_tax <- int_typo_final %>%
-    left_join(species_validation, by = "Species")
-  
-# Remove the original Species column and rename the validated species column
-int_tax <- int_tax %>%
-  select(-Species) %>%
-  rename(Species = Species_valid)
+# Interactions Data
+int_tax <- validate_species_taxonomy(int_typo_final)
 
 
 # Taxonomy Enrichment -----------------------------------------------------
@@ -763,102 +548,27 @@ int_tax <- int_tax %>%
 # Extract taxonomic classification from FishBase
 taxa <- load_taxa()
 
-#Population Data
-# Extract taxonomic information for species
-species_tax <- taxa %>%
-  filter(Species %in% unique(pop_tax$Species)) %>%
-  select(Species, Genus, Family, Order, Class)
+# The add_taxonomy() function (stored in Utils.R) was used to add
+# taxonomic information from FishBase and fill missing classifications
+# using genus-level information when species-level matches were unavailable.
 
-# Add taxonomic information to the dataset
-pop_tax <- pop_tax %>%
-  left_join(species_tax, by = "Species")
+# Population Data
+pop_tax <- add_taxonomy(pop_tax, taxa)
 
-# Solving NAs problem - Separate the Genus from species that FishBase does not recognize as valid
-pop_tax <- pop_tax %>%
-  mutate(Genus_search = word(Species, 1))
-
-# Fill NAs with the Genus
-pop_tax <- pop_tax %>%
-  mutate(
-    Genus = if_else(is.na(Genus), Genus_search, Genus)
-  )
-
-# Create a genus-level taxonomy table from FishBase
-genus_tax <- taxa %>%
-  select(Genus, Family, Order, Class) %>%
-  distinct(Genus, .keep_all = TRUE)
-
-# Add missing Family, Order and Class information based on Genus
-pop_tax <- pop_tax %>%
-  left_join(genus_tax, by = "Genus", suffix = c("", "_genus")) %>%
-  mutate(
-    Family = if_else(is.na(Family), Family_genus, Family),
-    Order = if_else(is.na(Order), Order_genus, Order),
-    Class = if_else(is.na(Class), Class_genus, Class)
-  ) %>%
-  select(-ends_with("_genus"))
-
-#Remove Genus_Search column
-pop_tax <- select(pop_tax, -Genus_search)
-
-#Interactions Data
-# Extract taxonomic information for species
-species_tax_int <- taxa %>%
-  filter(Species %in% unique(int_tax$Species)) %>%
-  select(Species, Genus, Family, Order, Class)
-
-# Add taxonomic information to the dataset
-int_tax <- int_tax %>%
-  left_join(species_tax_int, by = "Species")
-
-# Solving NAs problem - Separate the Genus from species that FishBase does not recognize as valid
-int_tax <- int_tax %>%
-  mutate(Genus_search = word(Species, 1))
-
-# Fill NAs with the Genus
-int_tax <- int_tax %>%
-  mutate(
-    Genus = if_else(is.na(Genus), Genus_search, Genus)
-  )
-
-# Create a genus-level taxonomy table from FishBase
-genus_tax <- taxa %>%
-  select(Genus, Family, Order, Class) %>%
-  distinct(Genus, .keep_all = TRUE)
-
-# Add missing Family, Order and Class information based on Genus
-int_tax <- int_tax %>%
-  left_join(genus_tax, by = "Genus", suffix = c("", "_genus")) %>%
-  mutate(
-    Family = if_else(is.na(Family), Family_genus, Family),
-    Order = if_else(is.na(Order), Order_genus, Order),
-    Class = if_else(is.na(Class), Class_genus, Class)
-  ) %>%
-  select(-ends_with("_genus"))
-
-#Remove Genus_Search column
-int_tax <- select(int_tax, -Genus_search)
-
-# Note: I think there is a faster way to do this, but I couldn't 
-# find an alternative way that worked.
+# Interactions Data
+int_tax <- add_taxonomy(int_tax, taxa)
 
 
 # Saving Cleaned Datasets -------------------------------------------------
 
-# Creating new Objects just to organize the final Datasets and see if everything is corrected
+# Creating new Objects just to organize the final Datasets
 interactions_final <- int_tax
 population_final <- pop_tax
-
-view(population_final)
-view(interactions_final)
 
 # Saving Population .csv
 write.csv(population_final,"03.Output/population_final.csv", row.names = FALSE)
 
 # Saving Interactions .csv
 write.csv(interactions_final,"03.Output/interactions_final.csv", row.names = FALSE)
-
-
-############################### END ##########################################
 
 
