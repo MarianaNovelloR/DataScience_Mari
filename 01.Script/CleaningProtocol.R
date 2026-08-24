@@ -1,7 +1,7 @@
 # Course: Data Science in R
 # Project: Data Cleaning Pipeline
 # Author: Mariana Novello 
-
+ 
 
 # Overview:
 # This script implements a reproducible data cleaning protocol to improve data
@@ -40,7 +40,7 @@ library(stringi)           # Text standardization
 
 
 # Load utility functions --------------------------------------------------
-source("01.Scripts/utils.R")
+source("01.Script/UtilsR.R") 
 
 # Import Database ----------------------------------------------------------
 
