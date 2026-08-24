@@ -39,6 +39,9 @@ library(rnaturalearth)     # World Map Data from Natural Earth
 library(stringi)           # Text standardization
 
 
+# Load utility functions --------------------------------------------------
+source("01.Scripts/utils.R")
+
 # Import Database ----------------------------------------------------------
 
 popul <- read.csv("02.Raw_Data/Populations_merged.csv")         #Population Data
@@ -109,65 +112,44 @@ int_reduced <- mutate(int_reduced,
 
 
 # Text Standardization ----------------------------------------------------
-# across(): Apply the same transformation to multiple columns
-# str_to_lower(): converts to lower case
+# The clean_text() function (stored in utils.R) was applied to standardize
+# text variables (lowercase, white space, and accents).
 
-# Converting selected text variables to lowercase 
 # Population Data
-pop_textclean_low <- mutate(pop_reduced,
-                            across(c(Type, Habitat), str_to_lower))
-
+pop_textclean <- clean_text(
+  pop_reduced,
+  cols_to_lower = c(
+    "Type",
+    "Habitat"
+  )
+)
 
 # Interaction Data
-int_textclean_low <- mutate(int_reduced,
-                            across(c(Quantified_at_the,
-                                     Sampled_at_the,
-                                     Method, Source,
-                                     Origin, Category), str_to_lower))
+int_textclean <- clean_text(
+  int_reduced,
+  cols_to_lower = c(
+    "Quantified_at_the",
+    "Sampled_at_the",
+    "Method",
+    "Source",
+    "Origin",
+    "Category"
+  )
+)
 
-# Note: Species names and locality names were not standardized at this stage to 
-# avoid interfering with subsequent taxonomic and coordinate validation
-
-# Removing accents from all text variables
-# where(): select columns from a data frame based on a data type
-# stri_trans_general(): General Text Transforms, Including Transliteration
-# Latin-ASCII: Converts characters from the Latin alphabet into ASCII equivalents
-# ASCII is a character encoding system that includes unaccented letters, numbers, and symbols
-
-# Population Data
-pop_textclean_acc <- mutate(pop_textclean_low,
-                            across(where(is.character),
-                                   ~ stri_trans_general(., "Latin-ASCII")))
-
-
-# Interaction Data
-int_textclean_acc <- mutate(int_textclean_low,
-                            across(where(is.character), 
-                                   ~ stri_trans_general(., "Latin-ASCII")))
-
-
-# Removing extra white space
-# str_squish(): removes white space at the start and end, and replaces all 
-# internal whitespace with a single space
-
-# Population Data
-pop_textclean_whi <- mutate(pop_textclean_acc,
-  across(where(is.character), str_squish))
-
-# Interactions Data
-int_textclean_whi <- mutate(int_textclean_acc,
-  across(where(is.character), str_squish))
-
+# Note: Species and Locality were not converted to lowercase
+# at this stage to avoid interfering with subsequent taxonomic and
+# coordinate validation.
 
 # Checking categories for typos -------------------------------------------
 # lapply(): applies a function across all columns
 # unique(): lists all the distinct categories
 
 # Population
-lapply(pop_textclean_whi, unique)
+lapply(pop_textclean, unique)
 
 # Interactions
-lapply(int_textclean_whi, unique)
+lapply(int_textclean, unique)
 
 # Note: The data contains typos, values assigned to the wrong columns, and
 # incorrect dates that are in the future.
@@ -179,10 +161,10 @@ lapply(int_textclean_whi, unique)
 
 # Population Data
 # Check which rows the categories were swapped
-freshwater_rows <- filter(pop_textclean_whi, Habitat == "freshwater") #Habitat and Type were swapped
+freshwater_rows <- filter(pop_textclean, Habitat == "freshwater") #Habitat and Type were swapped
 
 # Correcting swapped classifications between Type and Habitat
-pop_typo <- pop_textclean_whi %>%
+pop_typo <- pop_textclean %>%
   mutate(temp = Type,
          Type = ifelse(Habitat == "freshwater" 
                        & Type %in% c("river", "reservoir", "lagoon"),
@@ -224,7 +206,7 @@ pop_invalid_values <- pop_typo %>%
   distinct()
 
 # Interactions Data
-int_invalid_values <- int_textclean_whi %>%
+int_invalid_values <- int_textclean %>%
   filter(
     !Source %in% int_categories$Source |
       !Origin %in% int_categories$Origin |
@@ -331,7 +313,7 @@ for (i in 1:nrow(pop_typo_suggestions)) {
 }
 
 # Interactions Data
-int_typo <- int_textclean_whi #Created a new object just to see the progress
+int_typo <- int_textclean #Created a new object just to see the progress
 
 for (i in 1:nrow(typo_suggestions_int)) {
   
